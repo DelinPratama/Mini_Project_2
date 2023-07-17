@@ -47,18 +47,34 @@ module.exports = {
           let token = createToken({ id, username, email, role, is_verified });
 
           //*EMAIL VERIFICATION
-          //!NOT READY
-          //   let mail = {
-          //     from: `Admin <delinpratama24@gmail.com>`,
-          //     to: `${email}`,
-          //     subject: `Account Verification`,
-          //     html: `<a href=>click here for verification your account</a>`,
-          //   };
+          let mail = {
+            from: `Admin <delinpratama24@gmail.com>`,
+            to: `${email}`,
+            subject: `Account Verification`,
+            // html: `<a href=>click here for verification your account</a>`,
+          };
 
-          //   transporter.sendMail;
+          transporter.sendMail(mail, (errMail, resMail) => {
+            if (errMail) {
+              console.log(errMail);
+              res.status(500).send({ message: "Registration failed", success: false, err: errMail });
+            }
+            res.status(200).send({ message: "Registration success, check your email", success: true }); //! USER TERDAFTAR TAPI EMAIL BELUM BISA TERKIRIM
+          });
         });
       }
-      res.status(200).send({ message: `User berhasil ditambah` });
+      // res.status(200).send({ message: `User berhasil ditambah` });
+    });
+  },
+  verification: (req, res) => {
+    let updateQuery = `update user  set is_verified=true where id=${req.user.id};`;
+
+    db.query(updateQuery, (err, results) => {
+      if (err) {
+        console.log(err);
+        res.status(500).send(err);
+      }
+      res.status(200).send({ message: "Verified account", success: true });
     });
   },
 };

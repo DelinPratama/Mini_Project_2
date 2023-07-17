@@ -11,5 +11,6 @@ routers.delete("/deleteArticle/:id", blogController.deleteArticle);
 //*USER ROUTERS
 routers.get("/user/getData/", userController.getData);
 routers.post("/adduser", userController.addUser);
+routers.patch("/verified", userController.verification);
 
 module.exports = routers;
