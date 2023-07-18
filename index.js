@@ -20,6 +20,6 @@ app.get("/", (req, res) => {
 });
 
 //* IMPORT ROUTERS
-const { blogRouters } = require("./routers");
+const { blogRouters, userRouters } = require("./routers");
 
-app.use(blogRouters);
+app.use(blogRouters, userRouters);

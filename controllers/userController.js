@@ -2,6 +2,8 @@ const { db } = require("../database");
 const crypto = require("crypto");
 const { createToken } = require("../helper/createToken");
 const transporter = require("../helper/nodemailer");
+const otpGenerator = require("otp-generator");
+const { error } = require("console");
 
 module.exports = {
   //*GET USER DATA
@@ -26,55 +28,77 @@ module.exports = {
 
     createdAt = new Date();
 
-    let insertQuery = `insert into user values (null, ${db.escape(username)},${db.escape(email)},${db.escape(phone)},${db.escape(hashedPassword)},${db.escape(img_profile)},${db.escape(is_verified)},${db.escape(role)},${db.escape(
-      createdAt
-    )},${db.escape(updateAt)})`;
+    //* GENERATE OTP CODE
+    const otpCode = otpGenerator.generate(6, { digits: true, lowerCaseAlphabets: false, upperCaseAlphabets: false, specialChars: false });
+    const otpExpiration = new Date(Date.now() + 10 * 60000);
+
+    let insertQuery = `insert into user values (null, ${db.escape(username)},${db.escape(email)},${db.escape(phone)},${db.escape(hashedPassword)},${db.escape(img_profile)},${db.escape(is_verified)},2,${db.escape(createdAt)},${db.escape(
+      updateAt
+    )},${otpCode},${db.escape(otpExpiration)})`;
     db.query(insertQuery, (err, results) => {
       if (err) {
         res.status(500).send(err);
       }
-      if (results.insertId) {
-        let sqlGet = `select * from user where id = ${results.insertId}`;
-        db.query(sqlGet, (err2, results2) => {
-          if (err2) {
-            res.status(500).send(err);
-          }
+      // if (results.insertId) {
+      //   let sqlGet = `select * from user where id = ${results.insertId}`;
+      //   db.query(sqlGet, (err2, results2) => {
+      //     if (err2) {
+      //       res.status(500).send(err);
+      //     }
 
-          //*DATA UNTUK MEMBUAT TOKEN
-          let { id, username, email, role, is_verified } = results2[0];
+      //     //*DATA UNTUK MEMBUAT TOKEN
+      //     let { id, username, email, role, is_verified } = results2[0];
 
-          //*CREATE TOKEN
-          let token = createToken({ id, username, email, role, is_verified });
+      //     //*CREATE TOKEN
+      //     let token = createToken({ id, username, email, role, is_verified });
 
-          //*EMAIL VERIFICATION
-          let mail = {
-            from: `Admin <delinpratama24@gmail.com>`,
-            to: `${email}`,
-            subject: `Account Verification`,
-            // html: `<a href=>click here for verification your account</a>`,
-          };
+      //*EMAIL VERIFICATION
+      const mailOption = {
+        from: process.env.EMAIL_USERNAME,
+        to: email,
+        subject: "Email verification OTP",
+        text: `Your OTP code id ${otpCode}`,
+      };
 
-          transporter.sendMail(mail, (errMail, resMail) => {
-            if (errMail) {
-              console.log(errMail);
-              res.status(500).send({ message: "Registration failed", success: false, err: errMail });
-            }
-            res.status(200).send({ message: "Registration success, check your email", success: true }); //! USER TERDAFTAR TAPI EMAIL BELUM BISA TERKIRIM
-          });
-        });
-      }
-      // res.status(200).send({ message: `User berhasil ditambah` });
+      transporter.sendMail(mailOption, (error, info) => {
+        if (error) {
+          console.log(error);
+        }
+        console.log("Email sent : " + info.response);
+      });
+
+      res.status(200).send({ message: `Registration success, please check your email for verification !` });
     });
   },
-  verification: (req, res) => {
-    let updateQuery = `update user  set is_verified=true where id=${req.user.id};`;
 
-    db.query(updateQuery, (err, results) => {
+  //*VERIFIKASI OTP
+  verificationOTP: (req, res) => {
+    const { otp } = req.body;
+
+    const verifikasiQuery = `SELECT * FROM user WHERE otp = ${db.escape(otp)} AND otp_expire > NOW()`;
+
+    db.query(verifikasiQuery, (err, results) => {
       if (err) {
-        console.log(err);
         res.status(500).send(err);
+      } else {
+        if (results.length > 0) {
+          // Kode OTP valid
+          const userId = results[0].id;
+
+          const updateQuery = `UPDATE user SET is_verified = "TRUE" WHERE id = ${db.escape(userId)}`;
+          db.query(updateQuery, (updateErr) => {
+            if (updateErr) {
+              res.status(500).send(updateErr);
+            } else {
+              // Verifikasi email berhasil
+              res.status(200).send("Email verification success");
+            }
+          });
+        } else {
+          // Kode OTP tidak valid atau telah kedaluwarsa
+          res.status(400).send("Kode OTP tidak valid atau telah kedaluwarsa");
+        }
       }
-      res.status(200).send({ message: "Verified account", success: true });
     });
   },
 };
